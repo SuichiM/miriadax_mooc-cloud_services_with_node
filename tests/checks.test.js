@@ -17,7 +17,8 @@ let error_critical = null;
 //TESTS
 describe("mooc_node-mod3_stock_obj_closure", function () {
 
-    it('', async function () { this.name = `1: Checking that the file 'mooc_node-mod3_stock_obj_closure.js' exists...`;
+    it('', async function () { 
+        this.name = `1: Checking that the file 'mooc_node-mod3_stock_obj_closure.js' exists...`;
         this.score = 1;
         this.msg_ok = `The file 'mooc_node-mod3_stock_obj_closure.js' has been found`;
         this.msg_err = `The file 'mooc_node-mod3_stock_obj_closure.js' has NOT been found at '${path_assignment}'`;
@@ -28,7 +29,8 @@ describe("mooc_node-mod3_stock_obj_closure", function () {
         path_ok.should.be.equal(true);
     });
 
-    it(`2: Checking that the file 'mooc_node-mod3_stock_obj_closure.js' contains the Stock object...`,  async function () {
+    it(`2: Checking that the file 'mooc_node-mod3_stock_obj_closure.js' contains the Stock object...`,  
+    async function () {
         this.score = 1;
         if (error_critical) {
             this.msg_err = error_critical;
@@ -46,7 +48,8 @@ describe("mooc_node-mod3_stock_obj_closure", function () {
         }
     });
 
-    it("3: Checking that the 'get' method returns the correct number...",  async function () {
+    it("3: Checking that the 'get' method returns the correct number...",  
+    async function () {
         this.score = 2;
         if (error_critical) {
             this.msg_err = error_critical;
@@ -75,7 +78,7 @@ describe("mooc_node-mod3_stock_obj_closure", function () {
             let shop = mystock("My Shop");
             shop.new_p('a1', 'fork');
             shop.add('a1', 3);
-            const input = "shop.new_p('a1', 'fork');shop.add('a1', 3);";
+            const input = "shop.new_p('a1', 'fork'); shop.add('a1', 3);";
             const expected = "a1";
             const output = shop.get_p("a1")["code"];
             console.log(typeof output);
@@ -93,10 +96,10 @@ describe("mooc_node-mod3_stock_obj_closure", function () {
         } else {
             const mystock = require(path_assignment).stock;
             let shop = mystock("My Shop");
-            shop.addJSON('{ "spoon":{"n":2, "code":5}, "knife":{"n": 3, "code":9} }');
-            const input = `shop.addJSON('{ "spoon":{"n":2, "code":5}, "knife":{"n": 3, "code":9} }');`;
-            console.log(shop.getJSON());
-            const expected = '{"spoon":{"code":5,"n":2},"knife":{"code":9,"n":3}}';
+            shop.addJSON('{ "2":{"desc":spoon, "n":5}, "3":{"n": 3, "desc":"knife"} }');
+            const input = `shop.addJSON('{ "2":{"desc":spoon, "n":5}, "3":{"n": 3, "desc":"knife"} }');`;
+            console.log('Salida: ' + shop.getJSON());
+            const expected = '{ "2":{"desc":spoon, "n":5}, "3":{"n": 3, "desc":"knife"} }';
             const output = shop.getJSON();
             this.msg_ok = `The 'AddJSON' method has been correctly implemented`;
             this.msg_err = `'${expected}' has not been found when executing '${input}'\n\t\t\tReceived: ${output}`;
