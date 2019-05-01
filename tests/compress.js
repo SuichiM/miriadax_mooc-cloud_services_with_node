@@ -2,8 +2,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const archiver = require('archiver');
 
-const orig = path.resolve(path.join(__dirname, "mooc_node-mod1_types_sentences.zip"));
-const dest = path.resolve(path.join(__dirname ,"../mooc_node-mod1_types_sentences.zip"));
+const orig = path.resolve(path.join(__dirname, "mooc_node-mod4_file_reflex.zip"));
+const dest = path.resolve(path.join(__dirname ,"../mooc_node-mod4_file_reflex.zip"));
 const output = fs.createWriteStream(orig);
 const archive = archiver('zip', {
     zlib: { level: 9 } // Sets the compression level.
