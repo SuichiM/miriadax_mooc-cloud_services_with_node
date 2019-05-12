@@ -1,5 +1,5 @@
 /**
- * Types-sentences assignment checker
+ * Corrector para la práctica de cmd
  */
 
 // IMPORTS
@@ -8,64 +8,33 @@ const path = require('path');
 const fs = require('fs-extra');
 const Utils = require('./utils');
 const to = require('./to');
-const execFile = require("child_process").execFile;
-
-// PATHS
-const path_assignment = path.resolve(path.join(__dirname, "../"));
-const path_file = path.join(path_assignment, 'mod1_types_sentences.js');
+const spawn = require("child_process").spawn;
 
 // CRITICAL ERRORS
 let error_critical = null;
 
-// EXPECTED OUTPUT
-let output = "";
-const EXPECTED = `
-Good morning, its 11 hours
+// CONSTANTS
+const T_WAIT = 2; // Time between commands
+const T_TEST = 2 * 60; // Time between tests (seconds)
+const path_assignment = path.resolve(path.join(__dirname, "../"));
+const quizzes_orig = path.join(path_assignment, 'quizzes.json');
+const quizzes_back = path.join(path_assignment, 'quizzes.original.json');
+const quizzes_test = path.join(path_assignment, 'tests', 'quizzes.json');
+let client = null;
 
-Número PI con 6 decimales: 3.141593
-
-0 dec = 0 hex = 0 oct = 0 bin
-1 dec = 1 hex = 1 oct = 1 bin
-2 dec = 2 hex = 2 oct = 10 bin
-3 dec = 3 hex = 3 oct = 11 bin
-4 dec = 4 hex = 4 oct = 100 bin
-5 dec = 5 hex = 5 oct = 101 bin
-6 dec = 6 hex = 6 oct = 110 bin
-7 dec = 7 hex = 7 oct = 111 bin
-8 dec = 8 hex = 10 oct = 1000 bin
-9 dec = 9 hex = 11 oct = 1001 bin
-10 dec = a hex = 12 oct = 1010 bin
-11 dec = b hex = 13 oct = 1011 bin
-12 dec = c hex = 14 oct = 1100 bin
-13 dec = d hex = 15 oct = 1101 bin
-14 dec = e hex = 16 oct = 1110 bin
-15 dec = f hex = 17 oct = 1111 bin
-16 dec = 10 hex = 20 oct = 10000 bin
-17 dec = 11 hex = 21 oct = 10001 bin
-18 dec = 12 hex = 22 oct = 10010 bin
-19 dec = 13 hex = 23 oct = 10011 bin
-20 dec = 14 hex = 24 oct = 10100 bin
-
-1 dec = 1 hex = 1 oct = 1 bin
-3 dec = 3 hex = 3 oct = 11 bin
-5 dec = 5 hex = 5 oct = 101 bin
-7 dec = 7 hex = 7 oct = 111 bin
-9 dec = 9 hex = 11 oct = 1001 bin
-
-Hola in chino se escribe así:  嗨，你好吗
-
-The programa ha acabado de ejecutar: Tue Sep 04 2018 11:07:56 GMT+0200 (Romance Daylight Time)
-`;
-const EXPECTED_OUTPUT_LENGTH = EXPECTED.split(/\r?\n\r?\n/).length;
+// HELPERS
+const timeout = ms => new Promise(res => setTimeout(res, ms));
 
 //TESTS
-describe("mooc_node-mod1_types_sentences", function () {
+describe("mooc_node-mod5_quiz_cmd", function () {
+
+    this.timeout(T_TEST * 1000);
 
     it('', async function () {
-        this.name = `1: Checking that the assignment file exists...`;
-        this.score = 0.5;
-        this.msg_ok = `The directory '${path_assignment}' has been found`;
-        this.msg_err = `The directory '${path_assignment}' has NOT been found`;
+        this.name = `1(Precheck): Checking that the assignment directory exists...`;
+        this.score = 0;
+        this.msg_ok = `Found the directory '${path_assignment}'`;
+        this.msg_err = `Couldn't find the directory '${path_assignment}'`;
         const [error_path, path_ok] = await to(fs.pathExists(path_assignment));
         if (error_path) {
             error_critical = this.msg_err;
@@ -74,153 +43,379 @@ describe("mooc_node-mod1_types_sentences", function () {
     });
 
     it('', async function () {
-        this.name = `2: Running 'mooc_node-mod1_types_sentences.js'`;
-        this.score = 0.5;
+        this.name = `2(Precheck): Installing dependencies...`;
+        this.score = 0;
         if (error_critical) {
             this.msg_err = error_critical;
             should.not.exist(error_critical);
         } else {
-            this.msg_ok = "The file has been successfully run";
-            [error_exe, output] = await to(new Promise((resolve, reject) => {
-                execFile('node', [path_file], {encoding: 'utf8'}, (err, stdout) =>
-                    err ? reject(err) : resolve(stdout))
-            }));
-            if (error_exe) {
-                this.msg_err = `Error running the file.\n\t\t\tReceived: ${error_exe}`;
+            this.msg_ok = "Dependencies installed successfully";
+            this.msg_err = "Error installing dependencies";
+
+            // check that package.json exists
+            const path_json = path.join(path_assignment, 'package.json');
+            const [json_nok, json_ok] = await to(fs.pathExists(path_json));
+            if (json_nok || !json_ok) {
+                this.msg_err = `The file '${path_json}' has not been found`;
                 error_critical = this.msg_err;
-            } else {
-                output = output.split(/\r?\n\r?\n/);
             }
-            should.not.exist(error_exe);
+            should.not.exist(error_critical);
+
+            // check package.json format
+            const [error_json, contenido] = await to(fs.readFile(path_json, 'utf8'));
+            if (error_json) {
+                this.msg_err = `The file '${path_json}' doesn't have the right format`;
+                error_critical = this.msg_err;
+            }
+            should.not.exist(error_critical);
+            const es_json = Utils.isJSON(contenido);
+            if (!es_json) {
+                error_critical = this.msg_err;
+            }
+            should.not.exist(error_critical);
+
+            // inject local figlet
+            try {
+                const figdata = "module.exports.textSync = function(text){return text};";
+                fs.removeSync(path.join(path_assignment, 'node_modules', 'figlet'));
+                fs.mkdirSync(path.join(path_assignment, 'node_modules', 'figlet'));
+                fs.writeFileSync(path.join(path_assignment, 'node_modules', 'figlet', 'index.js'), figdata, {
+                    encoding: 'utf8',
+                    flag: 'w'
+                });
+            } catch (error) {
+                debug("Error wrapping figlet");
+            }
+
+            // replace answers file
+            let error_deps;
+            try {
+                fs.copySync(quizzes_orig, quizzes_back, {"overwrite": true});
+                fs.copySync(quizzes_test, quizzes_orig, {"overwrite": true});
+            } catch (e) {
+                error_deps = e;
+            }
+            if (error_deps) {
+                this.msg_err = "Error copying the answers file: " + error_deps;
+                error_critical = this.msg_err;
+            }
+            should.not.exist(error_critical);
+        }
+    });
+
+
+    it('', async function () {
+        this.name = `3(Precheck): Checking that the file 'quizzes.json' is read. Running 'list'...`;
+        this.score = 0;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["list"];
+            const expected = "Answer Number 1";
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.stdin.write(input[0] + "\n");
+            }
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
         }
     });
 
     it('', async function () {
-        this.name = `3: Checking the output length`;
-    this.score = 1.5;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "The output length is OK";
-        const output_length = output.length;
-        this.msg_err = `Unexpected output length.\n\t\t\tExpected: ${EXPECTED_OUTPUT_LENGTH} blocks\n\t\t\tRead: ${output_length} blocks`;
-        output_length.should.be.equal(EXPECTED_OUTPUT_LENGTH)
-    }
-});
-
-it('', async function () {
-    this.name = `4: Checking the initial greeting`;
-    this.score = 1.5;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        console.log(output[0]);
-        this.msg_ok = "The initial greeting has been found";
-        let hour = new Date().getHours();
-        if ((6 < hour) && (hour <= 12)) {
-            this.expected = /[días|morning]/i;
-        } else if (hour < 22) {
-            this.expected = /[tardes|afternoon]/i;
+        this.name = `4: Checking that invalid input parameters are detected. Running 'test'...`;
+        this.score = 1;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
         } else {
-            this.expected = /[noches|night]/i;
-        }
-        this.msg_err = `The initial greeting has NOT been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${output[0].trim()}`;
-        Utils.search(this.expected, output[0]).should.be.equal(true);
-    }
-});
-
-it('', async function () {
-    this.name = `5: Checking that the PI value is printed`;
-    this.score = 1.25;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "6 decimals of the PI value have been found";
-        this.expected = "3.141593";
-        this.msg_err = `6 decimals of the PI value have NOT been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${output[1].trim()}`;
-        Utils.search(this.expected, output[1]).should.be.equal(true);
-    }
-});
-
-it('', async function () {
-    this.name = `6: Checking the equivalence table`;
-    this.score = 1.25;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "All the values have been found";
-        this.error = false;
-        this.lines = output[2].split(/\r?\n/);
-        for (let d in this.lines) {
-            this.myreg = `.*?${d}.*?${(d >>> 0).toString(16)}.*?${(d >>> 0).toString(8)}.*?${(d >>> 0).toString(2)}.*?`;
-            this.expected = new RegExp(this.myreg);
-            let ok = Utils.search(this.expected, this.lines[d]);
-            if (!ok) {
-                this.error = true;
-                this.msg_err = `The element ${d} has not been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${this.lines[d].trim()}`;
+            const input = ["test"];
+            const expected = /error/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
             }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
         }
-        this.error.should.be.equal(false);
-    }
-});
+    });
 
-it('', async function () {
-    this.name = `7: Checking the equivalence table for odd numbers between 10 and 20`;
-    this.score = 1.25;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "All the values have been found";
-        this.error = false;
-        this.lines = output[3].split(/\r?\n/);
-        let i = 0;
-        for (let d = 0; d <= 22; ++d) {
-            if (((d % 2) === 1) && ((d < 10) || (d > 20))) {
-                this.myreg = `.+?${d}.+?${(d >>> 0).toString(16)}.+?${(d >>> 0).toString(8)}.+?${(d >>> 0).toString(2)}.+?`;
-                this.expected = new RegExp(this.myreg);
-                let ok = Utils.search(this.expected, this.lines[i]);
-                if (!ok) {
-                    this.error = true;
-                    this.msg_err = `The element ${i} has not been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${this.lines[i]}`;
-                }
-                i++;
-                this.error.should.be.equal(false);
+    it('', async function () {
+        this.name = `5: Checking that right answers are detected. Running 'test 1'...`;
+        this.score = 1;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["test 1", "OK"];
+            const expected = /\bcorrect/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
             }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
         }
-    }
-});
+    });
 
-it('', async function () {
-    this.name = `8: Checking that unicode characters are printed correctly`;
-    this.score = 1.25;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "'hello' in chinese has been found";
-        this.expected = "\u55e8\uff0c\u4f60\u597d\u5417";
-        this.msg_err = `'hello' in chinese has NOT been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${output[4].trim()}`;
-        Utils.search(this.expected, output[4]).should.be.equal(true);
-    }
-});
+    it('', async function () {
+        this.name = `6: Checking that wrong answers are detected. Running 'test 1'...`;
+        this.score = 1;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["test 1", "NOK"];
+            const expected = /incorrect/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
+        }
+    });
 
-it('', async function () {
-    this.name = `9: Checking that the farewell sentence is printed`;
-    this.score = 1.5;
-    if (error_critical) {
-        this.msg_err = error_critical;
-        should.not.exist(error_critical);
-    } else {
-        this.msg_ok = "The farewell sentence has been found";
-        this.expected = /The program has finished/i;
-        this.msg_err = `The farewell sentence has NOT been found.\n\t\t\tExpected: ${this.expected}\n\t\t\tReceived: ${output[5].trim()}`;
-        Utils.search(this.expected, output[5]).should.be.equal(true);
-    }
+    it('', async function () {
+        this.name = `7: Checking that right answers are detected. Running 'play'...`;
+        this.score = 1;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["play", "OK"];
+            const expected = /correct/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
+        }
+    });
+
+    it('', async function () {
+        this.name = `8: Checking that answers are correctly scored. Running 'play'...`;
+        this.score = 2;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["play", "OK"];
+            const expected = /aciertos:\s+1| 1\s+acierto/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
+        }
+    });
+
+    it('', async function () {
+        this.name = `9: Checking that wrong answers are detected. Running 'play'...`;
+        this.score = 2;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["play", "NOK"];
+            const expected = /incorrect/img;
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
+        }
+    });
+
+    it('', async function () {
+        this.name = `10: Checking that the wrong answer ends the game. Running 'play'...`;
+        this.score = 2;
+        if (error_critical) {
+            this.msg_err = error_critical;
+            should.not.exist(error_critical);
+        } else {
+            const input = ["play", "NOK"];
+            const expected = "fin";
+            let output = "";
+            let error_std = "";
+            client = spawn("node", ["main.js"], {cwd: path_assignment});
+            client.on('error', function (data) {
+                error_std += data
+            });
+            client.stdin.on('data', function (data) {
+                output += data
+            });
+            client.stdout.on('data', function (data) {
+                output += data
+            });
+            client.stderr.on('data', function (data) {
+                error_std += data
+            });
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[0] + "\n");
+            await timeout(T_WAIT * 1000);
+            client.stdin.write(input[1] + "\n");
+            await timeout(T_WAIT * 1000);
+            if (client) {
+                client.kill();
+            }
+            this.msg_ok = `Found '${expected}' in ${path_assignment}`;
+            this.msg_err = `Couldn't find '${expected}' in ${path_assignment}\nError:${error_std}\nReceived:${output}`;
+            error_std.should.be.equal("");
+            Utils.search(expected, output).should.be.equal(true);
+        }
+    });
+
+    after("Restoring the original file", async function () {
+        if(client){client.kill();await timeout(T_WAIT * 1000);}
+        fs.copySync(quizzes_back, quizzes_orig, {"overwrite": true});
+    });
 });
-})
-;
