@@ -85,7 +85,7 @@ rl
     }
 })
 .on('close', () => {
-    log('Adios!');
+    biglog('Hasta Pronto!' , 'blue');
     process.exit(0);
 });
 

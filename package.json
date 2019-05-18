@@ -13,7 +13,7 @@
     "CORE",
     "QUIT"
   ],
-  "author": "ging",
+  "author": "SuichiM based on: ging",
   "license": "Unlicense",
   "dependencies": {
     "underscore": "^1.8.3",

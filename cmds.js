@@ -151,7 +151,26 @@ exports.editCmd = (rl, id) => {
  * @param id Clave del quiz a probar.
  */
 exports.testCmd = (rl, id) => {
-    log('Probar el quiz indicado.', 'red');
+    
+    if (typeof id === "undefined") {
+        errorlog(`Falta el parámetro id.`);
+        return;
+    }
+
+    const quiz = model.getByIndex(id);
+
+    rl.question(colorize(`${quiz.question} :`, 'green'), userAnswer => {
+        
+        if(userAnswer === quiz.answer)
+            log(colorize('correcto', 'green'));
+        else
+            log(colorize(`incorrecto, ${quiz.question} => ${quiz.answer}`, 'red'));
+
+        rl.prompt();        
+    
+    });
+    
+
     rl.prompt();
 };
 
@@ -175,7 +194,7 @@ exports.playCmd = rl => {
  */
 exports.creditsCmd = rl => {
     log('Autores de la práctica:');
-    log('Nombre 1', 'green');
+    log('SuichiM', 'green');
     log('Nombre 2', 'green');
     rl.prompt();
 };
