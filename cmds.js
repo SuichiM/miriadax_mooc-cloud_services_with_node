@@ -162,9 +162,10 @@ exports.testCmd = (rl, id) => {
     rl.question(colorize(`${quiz.question} :`, 'green'), userAnswer => {
         
         if(userAnswer === quiz.answer)
-            log(colorize('correcto', 'green'));
+            biglog('correcto', 'green');
         else
-            log(colorize(`incorrecto, ${quiz.question} => ${quiz.answer}`, 'red'));
+            biglog(`incorrecto`, 'red'); 
+            log(`${quiz.question} Es: ${quiz.answer}`);
 
         rl.prompt();        
     
@@ -182,8 +183,44 @@ exports.testCmd = (rl, id) => {
  * @param rl Objeto readline usado para implementar el CLI.
  */
 exports.playCmd = rl => {
-    log('Jugar.', 'red');
-    rl.prompt();
+ 
+    const questions = model.getAll();
+    let puntaje = 0;
+    
+    const playGame = ()=>{
+
+        if(questions.length === 0){
+            biglog(`HAZ GANADO!!`, 'blue');
+            log(colorize(`Puntaje final:`, 'green'));
+            biglog(`${puntaje}`, 'green');
+            rl.prompt();
+            return;
+        }
+        
+        let rndm_idx = Math.random() * questions.length;
+        let quiz = questions.splice(rndm_idx, 1)[0];
+ 
+        rl.question(colorize(`${quiz.question} :`, 'green'), userAnswer => {
+        
+            if(userAnswer === quiz.answer){
+                biglog('correcto', 'green');
+                log(`Puntaje Actual: ${++puntaje}`);
+                playGame();
+            }else{
+                biglog(`incorrecto`, 'red'); 
+                log(`El juego ha Finalizado.`, 'red');
+                log(`Puntaje Final ${puntaje}`)
+            }
+    
+            rl.prompt();        
+        
+        });
+        
+        rl.prompt();
+
+    }    
+
+    playGame();
 };
 
 
@@ -194,8 +231,8 @@ exports.playCmd = rl => {
  */
 exports.creditsCmd = rl => {
     log('Autores de la práctica:');
-    log('SuichiM', 'green');
-    log('Nombre 2', 'green');
+    biglog('SuichiM', 'green');
+    log('Staff of the course!! https://miriadax.net/web/nodemooc/', 'green');
     rl.prompt();
 };
 
