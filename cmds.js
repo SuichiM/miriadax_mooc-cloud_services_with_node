@@ -2,8 +2,22 @@
 
 const {log, biglog, errorlog, colorize} = require("./out");
 
-const model = require('./model');
+const {models} = require('./model');
 
+const validateId = id =>{
+    return new Promise((resolve, reject)=>{
+
+        if(typeof id === "undefined")
+            return reject('falta el parametro {id}')
+
+            id = parseInt(id);
+
+            if(Number.isNaN(id))
+                return reject('El valor del parametro id no es un numero.')
+            
+            resolve(id);
+    });
+}
 
 /**
  * Muestra la ayuda.
@@ -32,10 +46,11 @@ exports.helpCmd = rl => {
  * @param rl Objeto readline usado para implementar el CLI.
  */
 exports.listCmd = rl => {
-    model.getAll().forEach((quiz, id) => {
-        log(` [${colorize(id, 'magenta')}]:  ${quiz.question}`);
-    });
-    rl.prompt();
+    
+    models.quiz.findAll()
+    .each(quiz=>log(`[${colorize(quiz.id,'magenta')}]: ${quiz.question}`))
+    .catch(err=> error.log(err.message))
+    .then(()=>rl.prompt())
 };
 
 
@@ -46,17 +61,17 @@ exports.listCmd = rl => {
  * @param id Clave del quiz a mostrar.
  */
 exports.showCmd = (rl, id) => {
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-    } else {
-        try {
-            const quiz = model.getByIndex(id);
-            log(` [${colorize(id, 'magenta')}]:  ${quiz.question} ${colorize('=>', 'magenta')} ${quiz.answer}`);
-        } catch(error) {
-            errorlog(error.message);
-        }
-    }
-    rl.prompt();
+    
+    validateId(id)
+    .then(id => models.quiz.findById(id))
+    .then(quiz =>{
+        if(!quiz)
+            reject(`No existe un quiz asociado al id: ${id}`);
+        
+        log(`${colorize(quiz.question,'magenta')} => ${quiz.answer}`)
+    })
+    .catch(err => console.log(err))
+    .then(() => rl.prompt)
 };
 
 

@@ -19,7 +19,7 @@ sequelize.define(
 );
 
 sequelize.sync()
-.then(() => quiz.count())
+.then(() => sequelize.models.quiz.count())
 .then((count) => {
   if (count===0) {
     
