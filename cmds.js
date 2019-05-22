@@ -1,4 +1,5 @@
 
+const Sequelize = require('sequelize');
 
 const {log, biglog, errorlog, colorize} = require("./out");
 
@@ -75,6 +76,13 @@ exports.showCmd = (rl, id) => {
 };
 
 
+const makeQuestion = (rl, text)=>{
+    return new Sequelize.Promise((resolve, reject)=>{
+        rl.question(colorize(text, 'red'), answer => {
+            resolve(answer.trim())
+        });
+    });
+}
 /**
  * Añade un nuevo quiz al módelo.
  * Pregunta interactivamente por la pregunta y por la respuesta.
@@ -87,16 +95,27 @@ exports.showCmd = (rl, id) => {
  * @param rl Objeto readline usado para implementar el CLI.
  */
 exports.addCmd = rl => {
-
-    rl.question(colorize(' Introduzca una pregunta: ', 'red'), question => {
-
-        rl.question(colorize(' Introduzca la respuesta ', 'red'), answer => {
-
-            model.add(question, answer);
-            log(` ${colorize('Se ha añadido', 'magenta')}: ${question} ${colorize('=>', 'magenta')} ${answer}`);
-            rl.prompt();
+    makeQuestion(rl, 'Introduzca una pregunta: ')
+    .then(question => {
+        return makeQuestion(rl, 'Introduzca una respuesta: ')
+        .then(answer =>{
+            return {question, answer}
         });
-    });
+    })
+    .then(quiz =>{
+        return models.quiz.create(quiz);
+    })
+    .then(quiz=>{
+        log(`se ha añadido: ${colorize(quiz.question,'magenta')} => ${quiz.answer}`)
+    })
+    .catch(Sequelize.ValidationError, error =>{
+        errorlog('quiz erroneo');
+        error.errors.forEach(({msg})=>errorlog(msg))
+    })
+    .then(()=>{
+        rl.prompt();
+    })
+    
 };
 
 
@@ -107,16 +126,12 @@ exports.addCmd = rl => {
  * @param id Clave del quiz a borrar en el modelo.
  */
 exports.deleteCmd = (rl, id) => {
-    if (typeof id === "undefined") {
-        errorlog(`Falta el parámetro id.`);
-    } else {
-        try {
-            model.deleteByIndex(id);
-        } catch(error) {
-            errorlog(error.message);
-        }
-    }
-    rl.prompt();
+    
+    validateId(id)
+    .then(id => models.quiz.destroy({where:{id}}))
+    .catch(err => console.log(err))
+    .then(() => rl.prompt)
+
 };
 
 
